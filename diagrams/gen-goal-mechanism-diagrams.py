@@ -467,7 +467,154 @@ def muse_diagram(out_path):
     return s.build(out_path)
 
 
+# ---- OpenClaw: Muse-style loop, built for OpenClaw (DESIGN) ----
+# Den asked: can we implement what Muse has, for OpenClaw? Yes.
+# Muse has no Judge, no goal tool, no post-turn hook — just a
+# system-prompt instruction, a durable goal, and an hourly supervisor
+# job. OpenClaw already has all the pieces: AGENTS.md (the system
+# prompt), cron jobs (the supervisor), the kanban board, agentTurn
+# (dispatch a subagent). This diagram is the design: what to build,
+# which files, and the implementation plan.
+
+def openclaw_muse_diagram(out_path):
+    s = Svg()
+    y = s.header(
+        "Muse-style goal loop, built for OpenClaw — design",
+        "No Judge, no goal tool, no post-turn hook — just an instruction, a durable goal, and an hourly supervisor job")
+    cx = W // 2
+    fx = cx - 300          # flow centre (board box sits on the right)
+    fw = 1200
+    fx0 = fx - fw // 2
+    gap = 34
+
+    # Goal instruction — in AGENTS.md (the system prompt).
+    s.box(fx0, y, fw, 150,
+          ["★ AGENTS.md — goal instruction (the system prompt)",
+           "When the user shares an enduring aspiration, a commitment,",
+           "progress, or a setback — declare it as the goal below."],
+          bold_border=True, fill=C["hl_fill"])
+    y += 150
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    # Durable goal — the GOAL section of AGENTS.md.
+    s.box(fx0, y, fw, 140,
+          ["Durable goal — AGENTS.md GOAL section",
+           "The goal text lives here. The supervisor reads it every run."])
+    y += 140
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+
+    # ---- THE LOOP (same shape as Hermes and Muse) ----
+    sup_start_y = y
+    s.box(fx0, y, fw, 84, ["Supervisor job runs (hourly, OpenClaw cron)"])
+    sup_start_cy = y + 42
+    y += 84
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    s.box(fx0, y, fw, 84, ["Reads the GOAL from AGENTS.md"])
+    y += 84
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    pick_y = y
+    s.box(fx0, y, fw, 96,
+          ["Reads the board, picks next UNBLOCKED card"])
+    pick_cy = y + 48
+    y += 96
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    s.box(fx0, y, fw, 96, ["Dispatches subagent via agentTurn"])
+    y += 96
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    s.box(fx0, y, fw, 96, ["Subagent builds the picked card"])
+    y += 96
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    upd_y = y
+    s.box(fx0, y, fw, 96, ["Subagent updates the board (kanban)"])
+    upd_cy = y + 48
+    y += 96
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    s.box(fx0, y, fw, 84, ["Supervisor job ends"])
+    y += 84
+
+    # Board box on the right (kanban DB)
+    b_x, b_w = fx0 + fw + 220, 640
+    b_y = pick_y + 14
+    s.rect(b_x, b_y, b_w, 180, C["box"], C["border"], 2)
+    s.text(b_x + b_w // 2, b_y + 52, "Board", BOX_T, C["ink"], bold=True)
+    s.text(b_x + b_w // 2, b_y + 52 + LINE_H, "kanban.db", BOX, C["ink"])
+    gap_cx = (fx0 + fw + b_x) // 2
+    s.arrow(fx0 + fw + 4, pick_cy, b_x - 6, b_y + 95)
+    s.text(gap_cx, (pick_cy + b_y + 95) // 2 - 26, "reads", SMALL, C["muted"])
+    s.arrow(fx0 + fw + 4, upd_cy, b_x - 6, b_y + 140)
+    s.text(gap_cx, (upd_cy + b_y + 140) // 2 - 26, "updates", SMALL, C["muted"])
+
+    # ---- CHECK (like Muse's check, no Judge) ----
+    y = y + 50
+    s.down_arrow(fx, y - 50, y)
+    jx, jw = fx - 1000, 2000
+    check_y = y
+    check_h = 240
+    s.rect(jx, check_y, jw, check_h, C["box"], C["border"], 2)
+    jcx = jx + jw // 2
+    s.text(jcx, check_y + 52,
+           "CHECK — Is there a next unblocked card?",
+           BOX_T, C["ink"], bold=True)
+    for i, ln in enumerate([
+        "The supervisor looks for the next card each hour. No Judge model.",
+        "If yes → next hour, the supervisor runs again (loop back).",
+        "If no → the goal is done (or blocked) — the loop pauses until there is work.",
+    ]):
+        s.text(jcx, check_y + 52 + (i + 1) * 46, ln, BOX, C["ink"])
+    check_cy = check_y + check_h // 2
+    y = check_y + check_h
+
+    # ---- LOOP BACK (right side): next hour → supervisor runs again ----
+    loop_rx = 2700
+    s.line(jx + jw, check_cy, loop_rx, check_cy)
+    s.line(loop_rx, check_cy, loop_rx, sup_start_cy)
+    s.arrow(loop_rx, sup_start_cy, fx0 + fw + 6, sup_start_cy)
+    s.text((fx0 + fw + loop_rx) // 2, sup_start_cy - 22,
+           "next hour — supervisor runs again", SMALL, C["muted"])
+
+    # Files — where each piece lives (dev-1)
+    y = y + 50
+    NW = 2000
+    NH = 48 + 44 + 4 * 40 + 16
+    note_box(s, (W - NW) // 2, y, NW, NH,
+             "Files — where each piece lives (dev-1)",
+             ["AGENTS.md — /home/engineer/.openclaw/workspaces/<agent>/AGENTS.md (instruction + GOAL section)",
+              "Supervisor job — OpenClaw cron, in openclaw.sqlite cron_jobs (hourly, runs agentTurn)",
+              "Board — /home/engineer/.hermes/kanban.db (Hermes kanban; Tony's board, --board default)",
+              "Subagent — dispatched via agentTurn to software-engineer (or the owning agent)"])
+    y += NH
+
+    # Implementation plan — 6 steps
+    y = y + 50
+    NH2 = 48 + 44 + 6 * 40 + 16
+    note_box(s, (W - NW) // 2, y, NW, NH2,
+             "Implementation plan — 6 steps (spec only, do not build until Den says so)",
+             ["1 · Add the goal instruction to AGENTS.md (the system prompt).",
+              "2 · Agent writes the goal into the GOAL section of AGENTS.md (durable).",
+              "3 · Create the hourly supervisor OpenClaw job (cron, agentTurn).",
+              "4 · Supervisor reads GOAL + board, picks next UNBLOCKED card, dispatches subagent.",
+              "5 · Subagent builds the card, updates the board (kanban).",
+              "6 · Verify: supervisor runs hourly, picks cards, board moves. No Judge, no goal tool."])
+    y += NH2
+
+    y = s.legend(y, [
+        "Solid arrow = flow  ·  loop on the right = next hour, back to the supervisor job",
+        "Same shape as the Hermes and Muse diagrams: goal → work cycle → check → loop back",
+        "Plain boxes, black on white, as in Den's sketch",
+    ])
+    s._h = y
+    return s.build(out_path)
+
+
 if __name__ == "__main__":
     d = os.path.dirname(os.path.abspath(__file__))
     hermes_diagram(os.path.join(d, "hermes-goal-mechanism.svg"))
     muse_diagram(os.path.join(d, "muse-goal-mechanism.svg"))
+    openclaw_muse_diagram(os.path.join(d, "openclaw-muse-design.svg"))
