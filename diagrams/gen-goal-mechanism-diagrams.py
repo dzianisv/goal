@@ -7,11 +7,17 @@ a vertical message flow, a Tools box on the side with an arrow, and the
 open question at the bottom answered: what injects the goal back, and when.
 
 Facts (verified from code, 2026-11-15):
-- Inference: the MAIN session infers the goal. The agent itself, in the
-  same turn as the user message, declares it with
+- Inference (Hermes): the MAIN session infers the goal. The agent itself,
+  in the same turn as the user message, declares it with
   goal(action="create", objective, acceptance_criteria). No background
   API call infers the goal. The only auxiliary model call is judge_goal,
   which only checks whether the goal is DONE.
+- Judge (Hermes): judge_goal is an auxiliary model call, in the
+  background. It runs AFTER a turn (evaluate_after_turn) and when the
+  agent calls goal(action="complete") (the completion audit). It asks
+  only "is the goal DONE?" — done / continue / blocked / wait. It runs
+  per turn ONLY for USER-set goals. Agent (self-inferred) goals SKIP
+  the per-turn judge — the heartbeat just continues them.
 - Injection (feeding the goal back): (1) heartbeat tick —
   next_continuation_prompt feeds the goal back as a user-role message;
   (2) idle-wake — the barrier-wake chore re-pokes an active goal with
@@ -19,11 +25,14 @@ Facts (verified from code, 2026-11-15):
   the EXISTING goal; neither infers a new one.
 - Hermes source: /home/engineer/.hermes/hermes-agent/
   tools/goal_tool.py, hermes_cli/goals.py, agent/prompt_builder.py:240.
-- Muse: the goal is set AUTOMATICALLY — Muse infers it from the
-  project/conversation and declares it itself (docs/goals.md, system
-  prompt, goal-mechanism-spec.md lines 9/50). No set-goal command from
-  Den; the hourly supervisor re-asserts it each run. From the design
-  description + Muse's goal docs, NOT from internals.
+- Muse: NO source code (closed). The "automatic" goal comes from an
+  instruction in the system prompt: create a goal when the user shares
+  an enduring aspiration, a commitment, progress, or a setback — even
+  without the word "goal". The agent saves it as a DURABLE goal (Goals
+  tab) with the goal tools. No per-session goal tool. No judge. The
+  hourly supervisor re-asserts the goal each run. Evidence: docs/goals.md
+  + the system prompt + Hermes's "Muse-style goal ownership" comment
+  (second-hand, from Hermes's code, not Muse's). Do not read more into it.
 
 Hand-built SVG, standard library only.
 Render: chrome-headless-shell --force-device-scale-factor=3 (native 3x;
@@ -65,6 +74,12 @@ class Svg:
         self.parts.append(
             f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="18" '
             f'fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>')
+
+    def dashed_rect(self, x, y, w, h, fill, stroke, sw=2):
+        self.parts.append(
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="18" '
+            f'fill="{fill}" stroke="{stroke}" stroke-width="{sw}" '
+            f'stroke-dasharray="12 9"/>')
 
     def text(self, x, y, s, size, color, bold=False, anchor="middle"):
         b = ' font-weight="700"' if bold else ''
@@ -150,12 +165,12 @@ def note_box(s, x, y, w, h, title, lines):
     return y + h
 
 
-# ---- Hermes ----
+# ---- Hermes: the whole agentic loop ----
 
 def hermes_diagram(out_path):
     s = Svg()
     y = s.header(
-        "How the goal works in Hermes",
+        "How the goal works in Hermes — the whole loop",
         "Read from the code: /home/engineer/.hermes/hermes-agent/  ·  verified 2026-11-15")
     cx = W // 2
 
@@ -173,77 +188,114 @@ def hermes_diagram(out_path):
     s.box(cx - 400, y, 360, 90, ["Session 2"])
     y = y + 90 + 30
 
-    # Message flow, centred under Session 1 (centre x = cx - 600)
-    fx = cx - 600  # flow centre
-    fw = 640
+    # ---- THE TURN (the loop) ----
+    # Flow column, centred. Tools box on the left, notes on the right.
+    fx = cx - 100   # flow centre
+    fw = 760
     fx0 = fx - fw // 2
     gap = 34
-    flow_y = y
-    s.box(fx0, y, fw, 84, ["System message"])
+
+    # Turn starts
+    turn_y = y
+    s.box(fx0, y, fw, 84, ["Turn starts — user message arrives"])
+    turn_cy = y + 42
     y += 84
     s.down_arrow(fx, y, y + gap)
     y += gap
-    s.box(fx0, y, fw, 84, ["User message"])
-    y += 84
-    s.down_arrow(fx, y, y + gap)
-    y += gap
+    # AI message
+    ai_y = y
     s.box(fx0, y, fw, 84, ["AI message"])
     y += 84
     s.down_arrow(fx, y, y + gap)
     y += gap
-    # Tool call — the inference, bold border
-    tool_y = y
-    s.box(fx0, tool_y, fw, 150,
-          ["Tool call: goal",
-           "{ create, objective,",
-           "acceptance_criteria }"],
+    # Goal inference — green, bold border. THE point where the goal is born.
+    inf_y = y
+    s.box(fx0, y, fw, 150,
+          ["★ Goal inferred HERE",
+           "no goal? agent calls goal(create)",
+           "objective + acceptance_criteria"],
           bold_border=True, fill=C["hl_fill"])
-    y = tool_y + 150
+    y = inf_y + 150
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    # Tool calls
+    calls_y = y
+    s.box(fx0, y, fw, 84, ["Tool calls — goal · read · write"])
+    calls_cy = y + 42
+    y += 84
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    # Tool results
+    s.box(fx0, y, fw, 84, ["Tool results come back"])
+    y += 84
+    # Turn ends
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    end_y = y
+    s.box(fx0, y, fw, 84, ["Turn ends"])
+    end_cy = y + 42
+    y = end_y + 84
 
-    # Tools box on the left, arrow from System message (as in the sketch)
-    tools_x, tools_y, tools_w, tools_h = 60, flow_y + 10, 400, 250
+    # Tools box on the left, aligned with Tool calls
+    tools_x, tools_w = 60, 380
+    tools_y = calls_cy - 120
+    tools_h = 240
     s.rect(tools_x, tools_y, tools_w, tools_h, C["box"], C["border"], 2)
     s.text(tools_x + tools_w // 2, tools_y + 52, "Tools:", BOX_T, C["ink"], bold=True)
     for i, t in enumerate(["goal", "read", "write"]):
         s.text(tools_x + tools_w // 2, tools_y + 52 + (i + 1) * LINE_H, t, BOX, C["ink"])
-    # arrow: System message bottom edge -> Tools right edge (diagonal, as in sketch)
-    s.arrow(fx - 180, flow_y + 84, tools_x + tools_w + 5, tools_y + 130)
+    s.arrow(tools_x + tools_w + 4, calls_cy, fx0 - 6, calls_cy)
 
-    # Inference note, right of the tool-call box
-    inf_x = fx0 + fw + 80
-    inf_w = 1080
-    s.rect(inf_x, tool_y - 10, inf_w, 200, C["hl_fill"], C["border"], 2)
-    s.text(inf_x + 30, tool_y + 34, "★ AUTO-INFERRED — in the main session", BOX_T,
+    # Inference note, right of the green box
+    note_x = fx0 + fw + 80
+    note_w = 900
+    s.rect(note_x, inf_y - 10, note_w, 180, C["hl_fill"], C["border"], 2)
+    s.text(note_x + 30, inf_y + 34, "In the main session, in the same turn", BOX_T,
            C["ink"], bold=True, anchor="start")
     for i, ln in enumerate([
-        "The agent itself, in the same turn as the user message,",
-        "infers the goal and declares it with this call.",
+        "The agent itself infers the goal and",
+        "declares it with this call.",
         "No background API call infers the goal.",
     ]):
-        s.text(inf_x + 30, tool_y + 34 + (i + 1) * 40, ln, SMALL, C["ink"],
+        s.text(note_x + 30, inf_y + 34 + (i + 1) * 40, ln, SMALL, C["ink"],
                anchor="start")
 
-    # Judge box, right of the AI message box
-    ai_y = tool_y - gap - 84
-    j_x = fx0 + fw + 80
-    s.rect(j_x, ai_y - 10, inf_w, 104, C["box"], C["border"], 2)
-    s.text(j_x + 30, ai_y + 32, "Judge (auxiliary model) — checks DONE only", BOX_T,
-           C["ink"], bold=True, anchor="start")
-    s.text(j_x + 30, ai_y + 32 + 42,
-           "judge_goal asks only 'is the goal DONE?' — it never infers the goal.",
-           SMALL, C["ink"], anchor="start")
-    s.line(fx0 + fw + 4, ai_y + 42, j_x - 6, ai_y + 42, sw=2, dashed=True)
+    # ---- JUDGE (after the turn, background) ----
+    y = y + 50
+    # dashed arrow from Turn ends down to the Judge
+    s.arrow(fx, y - 50, fx, y, dashed=True)
+    # Judge box — dashed border = background step
+    jx, jw = cx - 1000, 2000
+    judge_y = y
+    s.dashed_rect(jx, judge_y, jw, 260, C["box"], C["border"], 2)
+    jcx = jx + jw // 2
+    s.text(jcx, judge_y + 52,
+           "After the turn — Judge runs (auxiliary model, in the background)",
+           BOX_T, C["ink"], bold=True)
+    for i, ln in enumerate([
+        "Judge asks only: is the goal DONE? → done / continue / blocked / wait",
+        "Only for USER-set goals. Agent goals skip the judge — heartbeat just continues them.",
+        "Goal done: agent calls goal(complete, evidence) → Judge audits → DONE → marked done.",
+    ]):
+        s.text(jcx, judge_y + 52 + (i + 1) * 46, ln, BOX, C["ink"])
+    judge_cy = judge_y + 130
+    y = judge_y + 260
 
-    # "..." then the injection box — answers the sketch's bottom question
-    y = y + 40
-    s.text(fx, y + 30, "…", 44, C["muted"])
-    y += 62
-    inj_x = cx - 1000
-    inj_w = 2000
+    # ---- LOOP BACK (right side): next turn, goal fed back in ----
+    loop_rx = 2700
+    s.line(jx + jw, judge_cy, loop_rx, judge_cy)
+    s.line(loop_rx, judge_cy, loop_rx, turn_cy)
+    s.arrow(loop_rx, turn_cy, fx0 + fw + 6, turn_cy)
+    s.text((fx0 + fw + loop_rx) // 2, turn_cy - 22, "next turn — goal fed back in",
+           SMALL, C["muted"])
+
+    # ---- INJECTION note: what feeds the goal back in ----
+    y = y + 50
+    inj_x, inj_w = cx - 1000, 2000
     inj_y = y
     s.rect(inj_x, inj_y, inj_w, 260, C["box"], C["border"], 2)
     s.text(cx, inj_y + 52,
-           "What injects the goal back into the session?", BOX_T, C["ink"], bold=True)
+           "What feeds the goal back in? (the loop above)", BOX_T, C["ink"], bold=True)
     for i, ln in enumerate([
         "1 · Heartbeat tick — next_continuation_prompt feeds the goal back as a user-role message.",
         "2 · Idle-wake — the barrier-wake chore re-pokes an active goal after 15 min idle (idle_wake_seconds = 900).",
@@ -253,15 +305,6 @@ def hermes_diagram(out_path):
            "Both re-assert the EXISTING goal. Never inferred in the background.",
            BOX, C["ink"], bold=True)
     y = inj_y + 260
-
-    # Feedback arrow: injection box -> back up into the User message box
-    user_y = tool_y - 2 * (gap + 84)  # top of User message box
-    user_cy = user_y + 42
-    rx = inj_x + inj_w - 60  # right side vertical
-    s.line(rx, inj_y, rx, user_cy)
-    s.arrow(rx, user_cy, fx0 + fw + 6, user_cy)
-    s.text(rx - 260, inj_y - 16, "goal fed back in", SMALL, C["muted"],
-           anchor="middle")
 
     # Bottom notes: override (left) + watch out (right)
     y = y + 50
@@ -282,36 +325,44 @@ def hermes_diagram(out_path):
     y += NH2
 
     y = s.legend(y, [
-        "Solid arrow = call / flow  ·  dashed line = the judge, called after a turn and at complete",
-        "Bold box = the auto-inferred goal  ·  plain boxes, black on white, as in Den's sketch",
+        "Solid arrow = flow  ·  dashed arrow = the judge (background, after a turn)  ·  loop on the right = next turn, goal fed back in",
+        "Inside a turn: AI message → tool calls → results, repeated till the agent stops calling tools",
+        "Bold green box = the goal, inferred in the main session  ·  plain boxes, black on white, as in Den's sketch",
     ])
     s._h = y
     return s.build(out_path)
 
 
-# ---- Muse ----
+# ---- Muse: the honest mechanism ----
 
 def muse_diagram(out_path):
     s = Svg()
     y = s.header(
         "How the goal works in Muse",
-        "From the design description + Muse's goal docs — NOT from Muse internals · do not read more into it")
+        "From the docs + system prompt — NOT from Muse internals (closed source) · do not read more into it")
     cx = W // 2
     fx = cx - 300          # flow centre (board box sits on the right)
     fw = 1200
     fx0 = fx - fw // 2
     gap = 34
 
-    # Step 1 — Muse sets the goal AUTOMATICALLY (auto-inference, same as Hermes)
+    # Step 1 — the system-prompt instruction. THIS is the "automatic".
     s.box(fx0, y, fw, 150,
-          ["★ 1 · Muse sets the goal AUTOMATICALLY",
-           "infers it from the project / conversation and declares it itself",
-           "no set-goal command from Den"],
+          ["★ 1 · System prompt: create a goal when the user",
+           "shares an enduring aspiration — even without",
+           "the word 'goal'. No set-goal command needed."],
           bold_border=True, fill=C["hl_fill"])
     y += 150
     s.down_arrow(fx, y, y + gap)
     y += gap
-    # Supervisor — re-asserts the auto-inferred goal
+    # Step 2 — durable goal
+    s.box(fx0, y, fw, 140,
+          ["Agent saves it as a DURABLE goal (Goals tab)",
+           "a milestone, not a per-session goal"])
+    y += 140
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    # Supervisor — re-asserts the goal
     s.box(fx0, y, fw, 140,
           ["Supervisor — hourly",
            "re-asserts that goal each run"])
@@ -336,19 +387,19 @@ def muse_diagram(out_path):
     upd_y = y
     y += 96
 
-    # Board box on the right (like Tools in the sketch)
+    # Board box on the right
     b_x, b_w = fx0 + fw + 220, 640
     b_y = sup_y + 40
-    s.rect(b_x, b_y, b_w, 220, C["box"], C["border"], 2)
+    s.rect(b_x, b_y, b_w, 180, C["box"], C["border"], 2)
     s.text(b_x + b_w // 2, b_y + 52, "Board", BOX_T, C["ink"], bold=True)
-    for i, ln in enumerate(["the cards", "goal: declared by Muse"]):
+    for i, ln in enumerate(["the cards"]):
         s.text(b_x + b_w // 2, b_y + 52 + (i + 1) * LINE_H, ln, BOX, C["ink"])
     # arrows: supervisor reads, subagent updates (labels above the lines, in the gap)
     gap_cx = (fx0 + fw + b_x) // 2
-    s.arrow(fx0 + fw + 4, pick_y + 48, b_x - 6, b_y + 110)
-    s.text(gap_cx, (pick_y + 48 + b_y + 110) // 2 - 26, "reads", SMALL, C["muted"])
-    s.arrow(fx0 + fw + 4, upd_y + 48, b_x - 6, b_y + 170)
-    s.text(gap_cx, (upd_y + 48 + b_y + 170) // 2 - 26, "updates", SMALL, C["muted"])
+    s.arrow(fx0 + fw + 4, pick_y + 48, b_x - 6, b_y + 95)
+    s.text(gap_cx, (pick_y + 48 + b_y + 95) // 2 - 26, "reads", SMALL, C["muted"])
+    s.arrow(fx0 + fw + 4, upd_y + 48, b_x - 6, b_y + 140)
+    s.text(gap_cx, (upd_y + 48 + b_y + 140) // 2 - 26, "updates", SMALL, C["muted"])
 
     # Loop-back: next hour, supervisor runs again (left side)
     loop_x = 120
@@ -359,15 +410,16 @@ def muse_diagram(out_path):
     s.text(loop_x + 130, y + 46 - 14, "next hour — supervisor runs again",
            SMALL, C["muted"], anchor="start")
 
-    # Bottom note
+    # Bottom note — what Muse does NOT have
     y = y + 110
     NW = 2000
-    NH = 48 + 44 + 3 * 40 + 16
+    NH = 48 + 44 + 4 * 40 + 16
     note_box(s, (W - NW) // 2, y, NW, NH,
-             "The goal is set automatically — Den never issues a set-goal command",
-             ["Muse infers the goal from the project / conversation and declares it itself.",
-              "Den states what he wants in conversation — product owner, not goal-setter.",
-              "No idle trigger — hourly schedule."])
+             "What Muse does NOT have (unlike Hermes)",
+             ["No per-session goal tool. No judge. No per-turn goal check.",
+              "Muse's goals are durable milestones in the Goals tab, kept alive",
+              "by the system-prompt instruction + the hourly supervisor job.",
+              "Internals are closed — this is from the docs + system prompt, not source code."])
     y += NH
 
     y = s.legend(y, [

@@ -45,6 +45,15 @@ One `state_meta` row per session: `goal:<session_id>` in the SessionDB. JSON. `l
 - Agent goals: never judged per turn. Returns `("active", True, next_continuation_prompt(), "continue", "heartbeat")`. Completion goes only through `complete` + audit.
 - User goals: judged per turn. Verdicts drive continue / wait / blocked / done.
 
+## The loop (one turn, then the next)
+
+1. **Turn starts.** A user message arrives (or a heartbeat tick feeds the goal back as a user-role message).
+2. **AI message.** The agent reads the turn. If it commits to a multi-step outcome and no goal is set, it calls `goal(action="create")` — that is the inference, in the main session, in this same turn.
+3. **Tool calls, then results.** The agent calls tools (`goal`, `read`, `write`). Results come back. AI message → tool calls → results repeats until the agent stops calling tools.
+4. **Turn ends.**
+5. **Judge runs** (background, auxiliary model). It asks only "is the goal DONE?" — but only for USER-set goals. Agent goals skip the per-turn judge; the heartbeat just continues them. The judge also runs when the agent calls `goal(complete, evidence)` — the audit.
+6. **Next turn.** Verdict `continue` → the heartbeat tick feeds the goal back as a user-role message, and the loop starts again at step 1. Idle 15 min → the barrier-wake chore re-pokes the goal.
+
 ## The prompt — `agent/prompt_builder.py` line 240
 
 The system prompt holds only the instruction to use the tool (`GOAL_TOOL_GUIDANCE`). The goal text never lives in the prompt. It comes back from `goal(action="get")`.
