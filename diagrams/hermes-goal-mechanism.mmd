@@ -1,3 +1,4 @@
+%%{init: {"theme": "base", "flowchart": {"nodeSpacing": 30, "rankSpacing": 40, "curve": "linear", "diagramPadding": 10}}}%%
 %% How the goal works in Hermes — compact, GitHub-readable.
 %% Styled to match the PNG: plain white boxes, black borders,
 %% green highlight on the auto-inferred goal. The PNG is the
@@ -5,6 +6,9 @@
 %% Read from the code: /home/engineer/.hermes/hermes-agent/
 %% tools/goal_tool.py, hermes_cli/goals.py, agent/prompt_builder.py.
 %% Verified 2026-11-15. Detail lives in hermes-goal-mechanism.md.
+%% NOTE: Mermaid decides node positions itself (dagre layout).
+%% This file controls boxes, labels, edges, colours, and spacing —
+%% not exact coordinates. The PNG keeps the exact sketch geometry.
 
 flowchart TD
     classDef plain fill:#fff,stroke:#000,stroke-width:2px,color:#000

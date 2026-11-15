@@ -1,3 +1,4 @@
+%%{init: {"theme": "base", "flowchart": {"nodeSpacing": 30, "rankSpacing": 40, "curve": "linear", "diagramPadding": 10}}}%%
 %% How the goal works in Muse — compact, GitHub-readable.
 %% Styled to match the PNG: plain white boxes, black borders,
 %% green highlight on the auto-inferred goal. The PNG is the
@@ -8,6 +9,9 @@
 %% from Den. From the design description + Muse's goal docs —
 %% NOT from Muse internals. Do not read more into it.
 %% Detail lives in muse-goal-mechanism.md.
+%% NOTE: Mermaid decides node positions itself (dagre layout).
+%% This file controls boxes, labels, edges, colours, and spacing —
+%% not exact coordinates. The PNG keeps the exact sketch geometry.
 
 flowchart TD
     classDef plain fill:#fff,stroke:#000,stroke-width:2px,color:#000
