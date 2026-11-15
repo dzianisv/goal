@@ -28,7 +28,8 @@ Facts (verified from code, 2026-11-15):
 Hand-built SVG, standard library only.
 Render: chrome-headless-shell --force-device-scale-factor=3 (native 3x;
 fall back to native 2x + PIL Lanczos upscale to 3x). Never 1x->3x.
-Repo keeps only .mmd + this generator — never PNG/SVG.
+Repo keeps only this generator — never PNG/SVG. Mermaid was removed:
+GitHub's auto-layout can't match the sketch style. Rendered PNGs go to Notion.
 """
 import os
 

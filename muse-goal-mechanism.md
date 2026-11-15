@@ -22,4 +22,4 @@ No idle trigger. Hourly schedule.
 
 Goals are durable milestones. Muse creates and manages them. A goal is created when the user shares an enduring aspiration, a commitment with a timeframe, progress, or a setback — even when they never say "goal". Real background work on a goal happens only through scheduled jobs. A goal by itself runs nothing.
 
-Diagram: [diagrams/muse-goal-mechanism.mmd](diagrams/muse-goal-mechanism.mmd).
+Diagram: drawn by `diagrams/gen-goal-mechanism-diagrams.py` (PNG on the Notion page).

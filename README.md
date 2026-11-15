@@ -8,14 +8,13 @@ One-line answer, both systems: the goal is auto-inferred. The agent itself reads
 - **Muse:** Muse infers the goal from the project and declares it. An hourly supervisor re-asserts it each run and picks the next card. See [muse-goal-mechanism.md](muse-goal-mechanism.md).
 - **OpenClaw:** spec only. Nothing is built. See [goal-mechanism-spec.md](goal-mechanism-spec.md).
 
-Diagrams live in `diagrams/` as Mermaid source plus the generator that renders the PNGs. No PNGs in this repo.
+Diagrams live in `diagrams/` as a Python generator that draws the PNGs. No PNGs in this repo.
 
 ## Files
 
 - `hermes-goal-mechanism.md` — how Hermes does it, from the code.
 - `muse-goal-mechanism.md` — how Muse does it, from the design description and Muse's goal docs.
 - `goal-mechanism-spec.md` — the OpenClaw build spec. Spec only.
-- `diagrams/hermes-goal-mechanism.mmd`, `diagrams/muse-goal-mechanism.mmd` — diagram sources.
-- `diagrams/gen-goal-mechanism-diagrams.py` — renders the PNGs from the same structure.
+- `diagrams/gen-goal-mechanism-diagrams.py` — draws both diagrams (SVG, rendered to PNG at 3x). Mermaid was removed: GitHub's auto-layout can't match the sketch style.
 
 Status: spec only (2026-11-15). Do not start implementation until Den says so.

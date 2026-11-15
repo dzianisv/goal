@@ -138,7 +138,7 @@ Do not call it done until ALL of these are verified by live readback, not by rea
 - A cron job that runs an inference turn to nudge the agent (the removed tony-goal-nudge mistake).
 - Goal text in a file (AGENTS.md, GOAL_STATE.md, or any other file).
 - Guard scripts that read the board (focus_guard.py, blocked_reason_guard.py — removed 2026-11-15).
-- A design diagram of the OLD guessed design (the goal-plugin-design diagram is wrong and superseded; do not rebuild it). The current diagrams live in `diagrams/` (Mermaid source + generator) and on the Notion page; they show the real mechanism, not the guess.
+- A design diagram of the OLD guessed design (the goal-plugin-design diagram is wrong and superseded; do not rebuild it). The current diagrams live in `diagrams/` (Python generator) and on the Notion page; they show the real mechanism, not the guess.
 
 ## 7. Open questions (for Den, only when the build starts)
 

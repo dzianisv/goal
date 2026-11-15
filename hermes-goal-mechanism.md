@@ -91,4 +91,4 @@ The heartbeat prompt files (`heartbeat-focus-prompt.md`, `heartbeat-prompt.md`) 
 5. **Stop-check plugin broken on Linux.** Symlink to a macOS path (`/Users/engineer/.hermes/plugins/agentpod-stop-check`). Does not load.
 6. **Goal tool off by default.** Silent unless opted in.
 
-Diagram: [diagrams/hermes-goal-mechanism.mmd](diagrams/hermes-goal-mechanism.mmd).
+Diagram: drawn by `diagrams/gen-goal-mechanism-diagrams.py` (PNG on the Notion page).
