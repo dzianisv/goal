@@ -1,0 +1,63 @@
+name: Render diagrams from draw.io
+
+# Re-renders the PNG/SVG from the .drawio sources whenever a diagram
+# changes, so the committed images always match the source. The .drawio
+# files are the source of truth; the .drawio.png/.drawio.svg files are
+# generated. Never edit the images by hand.
+#
+# Pushes made by this job do not re-trigger it: the paths filter below
+# only matches *.drawio, and GitHub does not start new runs from pushes
+# made with GITHUB_TOKEN.
+
+on:
+  push:
+    paths:
+      - 'diagrams/*.drawio'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install draw.io Desktop
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libasound2 libgbm1 libnss3
+          DEB_URL=$(curl -s https://api.github.com/repos/jgraph/drawio-desktop/releases/latest \
+            | jq -r '.assets[] | select(.name | endswith("amd64.deb")) | .browser_download_url' \
+            | head -n 1)
+          if [ -z "$DEB_URL" ] || [ "$DEB_URL" = "null" ]; then
+            echo "Could not find the draw.io amd64 .deb in the latest release" >&2
+            exit 1
+          fi
+          echo "draw.io .deb: $DEB_URL"
+          curl -sL -o /tmp/drawio.deb "$DEB_URL"
+          sudo dpkg -i /tmp/drawio.deb || sudo apt-get install -f -y -qq
+          drawio --version
+
+      - name: Export PNG and SVG
+        run: |
+          for f in diagrams/*.drawio; do
+            base="${f%.drawio}"
+            xvfb-run -a drawio --no-sandbox -x -f png -e --scale 3 -o "${base}.drawio.png" "$f"
+            xvfb-run -a drawio --no-sandbox -x -f svg -e -o "${base}.drawio.svg" "$f"
+          done
+          ls -la diagrams/
+
+      - name: Commit rendered diagrams
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add diagrams/*.drawio.png diagrams/*.drawio.svg
+          if git diff --cached --quiet; then
+            echo "No diagram changes."
+          else
+            git commit -m "CI: re-render diagrams from .drawio"
+            git push
+          fi
