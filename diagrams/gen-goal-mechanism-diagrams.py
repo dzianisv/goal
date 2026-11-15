@@ -12,12 +12,16 @@ Facts (verified from code, 2026-11-15):
   goal(action="create", objective, acceptance_criteria). No background
   API call infers the goal. The only auxiliary model call is judge_goal,
   which only checks whether the goal is DONE.
-- Judge (Hermes): judge_goal is an auxiliary model call, in the
-  background. It runs AFTER a turn (evaluate_after_turn) and when the
-  agent calls goal(action="complete") (the completion audit). It asks
-  only "is the goal DONE?" — done / continue / blocked / wait. It runs
-  per turn ONLY for USER-set goals. Agent (self-inferred) goals SKIP
-  the per-turn judge — the heartbeat just continues them.
+- Judge (Hermes): judge_goal is a separate auxiliary model call
+  (agent.auxiliary_client.call_llm). It runs in the post-turn hook
+  (_maybe_continue_goal_after_turn → evaluate_after_turn), AFTER the
+  turn ends — after the AI's final message, when the user already has
+  the response. It asks only "is the goal DONE?" — done / continue /
+  blocked / wait. If continue, the hook enqueues a continuation prompt
+  (next_continuation_prompt) which starts the next turn. It runs per
+  turn ONLY for USER-set goals. Agent (self-inferred) goals SKIP the
+  judge — evaluate_after_turn returns early with verdict "continue",
+  reason "heartbeat", and the continuation is enqueued directly.
 - Injection (feeding the goal back): (1) heartbeat tick —
   next_continuation_prompt feeds the goal back as a user-role message;
   (2) idle-wake — the barrier-wake chore re-pokes an active goal with
@@ -260,33 +264,37 @@ def hermes_diagram(out_path):
         s.text(note_x + 30, inf_y + 34 + (i + 1) * 40, ln, SMALL, C["ink"],
                anchor="start")
 
-    # ---- JUDGE (after the turn, background) ----
+    # ---- JUDGE (post-turn hook, IN the main flow) ----
+    # The Judge is a separate auxiliary model call. It runs AFTER the turn
+    # ends — after the AI's final message, when the user already has it.
+    # For USER goals it asks "is the goal DONE?"; for AGENT goals there is
+    # no Judge — the heartbeat just continues.
     y = y + 50
-    # dashed arrow from Turn ends down to the Judge
-    s.arrow(fx, y - 50, fx, y, dashed=True)
-    # Judge box — dashed border = background step
-    jx, jw = cx - 1000, 2000
+    s.down_arrow(fx, y - 50, y)
+    jx, jw = fx - 1000, 2000
     judge_y = y
-    s.dashed_rect(jx, judge_y, jw, 260, C["box"], C["border"], 2)
+    judge_h = 260
+    s.rect(jx, judge_y, jw, judge_h, C["box"], C["border"], 2)
     jcx = jx + jw // 2
     s.text(jcx, judge_y + 52,
-           "After the turn — Judge runs (auxiliary model, in the background)",
+           "POST-TURN — Judge runs (a separate auxiliary model call)",
            BOX_T, C["ink"], bold=True)
     for i, ln in enumerate([
-        "Judge asks only: is the goal DONE? → done / continue / blocked / wait",
-        "Only for USER-set goals. Agent goals skip the judge — heartbeat just continues them.",
-        "Goal done: agent calls goal(complete, evidence) → Judge audits → DONE → marked done.",
+        "Runs AFTER the AI's final message — the user already has the response.",
+        "USER goal: auxiliary model asks 'is the goal DONE?' → done / continue / blocked / wait",
+        "AGENT goal: NO judge — heartbeat just continues",
+        "If continue → continuation prompt is enqueued → next turn starts",
     ]):
         s.text(jcx, judge_y + 52 + (i + 1) * 46, ln, BOX, C["ink"])
-    judge_cy = judge_y + 130
-    y = judge_y + 260
+    judge_cy = judge_y + judge_h // 2
+    y = judge_y + judge_h
 
-    # ---- LOOP BACK (right side): next turn, goal fed back in ----
+    # ---- LOOP BACK (right side): continuation → next turn ----
     loop_rx = 2700
     s.line(jx + jw, judge_cy, loop_rx, judge_cy)
     s.line(loop_rx, judge_cy, loop_rx, turn_cy)
     s.arrow(loop_rx, turn_cy, fx0 + fw + 6, turn_cy)
-    s.text((fx0 + fw + loop_rx) // 2, turn_cy - 22, "next turn — goal fed back in",
+    s.text((fx0 + fw + loop_rx) // 2, turn_cy - 22, "continuation prompt → next turn",
            SMALL, C["muted"])
 
     # ---- INJECTION note: what feeds the goal back in ----
@@ -325,7 +333,7 @@ def hermes_diagram(out_path):
     y += NH2
 
     y = s.legend(y, [
-        "Solid arrow = flow  ·  dashed arrow = the judge (background, after a turn)  ·  loop on the right = next turn, goal fed back in",
+        "Solid arrow = flow  ·  loop on the right = next turn (continuation prompt feeds the goal back in)",
         "Inside a turn: AI message → tool calls → results, repeated till the agent stops calling tools",
         "Bold green box = the goal, inferred in the main session  ·  plain boxes, black on white, as in Den's sketch",
     ])
@@ -415,11 +423,11 @@ def muse_diagram(out_path):
     NW = 2000
     NH = 48 + 44 + 4 * 40 + 16
     note_box(s, (W - NW) // 2, y, NW, NH,
-             "What Muse does NOT have (unlike Hermes)",
-             ["No per-session goal tool. No judge. No per-turn goal check.",
-              "Muse's goals are durable milestones in the Goals tab, kept alive",
-              "by the system-prompt instruction + the hourly supervisor job.",
-              "Internals are closed — this is from the docs + system prompt, not source code."])
+             "Where each claim comes from (Den asked — no source code exists)",
+             ["(1) docs/goals.md — Muse's product doc: goals are managed (create / read / update / log).",
+              "(2) The system prompt — 'create a goal when the user shares an enduring aspiration'.",
+              "(3) Hermes's prompt_builder.py comment 'Muse-style goal ownership' — second-hand.",
+              "No per-session goal tool. No judge. No article, no Reddit, no shared code."])
     y += NH
 
     y = s.legend(y, [

@@ -2,6 +2,16 @@
 
 From the design description + Muse's goal docs (`docs/goals.md`, the system prompt). NOT from Muse internals — Muse is closed source, there is no public code to read. Do not read more into it.
 
+## Where this comes from (Den asked)
+
+There is no article, no Reddit post, and no shared source code. Muse is closed source — nothing to read. The mechanism above comes from three places:
+
+1. **`docs/goals.md`** — Muse's product doc. It describes goal management: goals are durable milestones, maintained and managed by Muse, created/read/updated/logged with the goal tools. It says real background work on a goal happens only through scheduled jobs.
+2. **The system prompt** — the instruction quoted below ("create a goal when the user shares an enduring aspiration..."). This is the "automatic" part. It is in Muse's own system prompt, which I can read.
+3. **Hermes's code** — `agent/prompt_builder.py` line 240 calls its design "Muse-style goal ownership: the model declares the session goal itself". That is Hermes's developers describing the pattern they copied. Second-hand, not Muse source.
+
+That is all the evidence there is. Do not read more into it.
+
 ## The goal is set automatically — how?
 
 There is no special goal tool and no per-session goal. The "automatic" part is an instruction in the system prompt, plus the goal tools.

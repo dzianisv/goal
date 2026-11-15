@@ -38,21 +38,23 @@ One `state_meta` row per session: `goal:<session_id>` in the SessionDB. JSON. `l
 
 ## The judge — `judge_goal` (line 1313)
 
-"Ask the auxiliary model whether the goal is satisfied." Returns verdict (done / blocked / continue / wait / skipped), reason, `parse_failed`, `wait_directive`, `transport_failed`. Transport errors fail open to `continue`.
+"Ask the auxiliary model whether the goal is satisfied." It calls the auxiliary model (`agent.auxiliary_client.call_llm`) — a separate model call, not the main agent. Returns verdict (done / blocked / continue / wait / skipped), reason, `parse_failed`, `wait_directive`, `transport_failed`. Transport errors fail open to `continue`.
+
+It is called from the post-turn hook `_maybe_continue_goal_after_turn` (`hermes_cli/cli_loops_mixin.py:694` — "Post-turn hook: judge the goal and maybe re-queue a continuation"). The hook runs after the turn ends, after the AI's final message — the user already has the response.
 
 `evaluate_after_turn` (line ~2180):
 
-- Agent goals: never judged per turn. Returns `("active", True, next_continuation_prompt(), "continue", "heartbeat")`. Completion goes only through `complete` + audit.
-- User goals: judged per turn. Verdicts drive continue / wait / blocked / done.
+- Agent goals: never judged per turn. Returns `("active", True, next_continuation_prompt(), "continue", "heartbeat")`. The hook enqueues that continuation prompt as a CLI wake, which starts the next turn. Completion goes only through `complete` + audit.
+- User goals: judged per turn. Verdicts drive continue / wait / blocked / done. If `continue`, the hook enqueues the continuation prompt the same way.
 
 ## The loop (one turn, then the next)
 
 1. **Turn starts.** A user message arrives (or a heartbeat tick feeds the goal back as a user-role message).
 2. **AI message.** The agent reads the turn. If it commits to a multi-step outcome and no goal is set, it calls `goal(action="create")` — that is the inference, in the main session, in this same turn.
 3. **Tool calls, then results.** The agent calls tools (`goal`, `read`, `write`). Results come back. AI message → tool calls → results repeats until the agent stops calling tools.
-4. **Turn ends.**
-5. **Judge runs** (background, auxiliary model). It asks only "is the goal DONE?" — but only for USER-set goals. Agent goals skip the per-turn judge; the heartbeat just continues them. The judge also runs when the agent calls `goal(complete, evidence)` — the audit.
-6. **Next turn.** Verdict `continue` → the heartbeat tick feeds the goal back as a user-role message, and the loop starts again at step 1. Idle 15 min → the barrier-wake chore re-pokes the goal.
+4. **Turn ends.** The AI's final message goes to the user.
+5. **Post-turn hook runs.** `_maybe_continue_goal_after_turn` fires after the turn. For USER-set goals it calls the Judge (a separate auxiliary model call) which asks only "is the goal DONE?" Agent goals skip the Judge — the hook just takes the continuation prompt. The Judge also runs when the agent calls `goal(complete, evidence)` — the audit.
+6. **Next turn.** If the verdict is `continue`, the hook enqueues the continuation prompt (`next_continuation_prompt`) as a CLI wake, and the loop starts again at step 1. The heartbeat tick and the idle-wake (15 min) feed the goal back the same way.
 
 ## The prompt — `agent/prompt_builder.py` line 240
 
