@@ -34,13 +34,17 @@ The behavior looks similar to Hermes (the goal appears without a set-goal comman
 
 Where the "Muse-style" phrase comes from: Hermes's own code (`agent/prompt_builder.py` line 240) calls its design "Muse-style goal ownership: the model declares the session goal itself". That is Hermes's developers describing the pattern they copied. It is second-hand evidence about Muse, not Muse source.
 
-## The loop
+## The loop — same shape as Hermes, different machinery
+
+Goal → work → check → repeat. Hermes checks with a Judge model per turn; Muse checks by looking for the next unblocked card each hour. No Judge.
 
 1. The system-prompt instruction creates the goal from the conversation (see above).
-2. An hourly supervisor re-asserts that goal each run and picks the next highest-priority UNBLOCKED card. The agent does not decide whether to work.
-3. A subagent builds the picked card. One subagent per task.
-4. The subagent updates the board.
-5. Next hour, the supervisor runs again.
+2. A supervisor run starts (hourly). It re-asserts that goal.
+3. The supervisor picks the next highest-priority UNBLOCKED card. The agent does not decide whether to work.
+4. A subagent builds the picked card. One subagent per task.
+5. The subagent updates the board.
+6. The supervisor run ends.
+7. CHECK — is there a next unblocked card? If yes, next hour the supervisor runs again (loop back to step 2). If no, the goal is done (or blocked) — the loop pauses until there is work.
 
 No idle trigger. Hourly schedule.
 

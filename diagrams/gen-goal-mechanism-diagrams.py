@@ -341,12 +341,12 @@ def hermes_diagram(out_path):
     return s.build(out_path)
 
 
-# ---- Muse: the honest mechanism ----
+# ---- Muse: the same loop, different machinery ----
 
 def muse_diagram(out_path):
     s = Svg()
     y = s.header(
-        "How the goal works in Muse",
+        "How the goal works in Muse — the same loop, different machinery",
         "From the docs + system prompt — NOT from Muse internals (closed source) · do not read more into it")
     cx = W // 2
     fx = cx - 300          # flow centre (board box sits on the right)
@@ -354,84 +354,113 @@ def muse_diagram(out_path):
     fx0 = fx - fw // 2
     gap = 34
 
-    # Step 1 — the system-prompt instruction. THIS is the "automatic".
+    # Goal setup — the "automatic" part (like Hermes's goal inference, but
+    # via a system-prompt instruction + a durable goal, not a goal tool).
     s.box(fx0, y, fw, 150,
-          ["★ 1 · System prompt: create a goal when the user",
-           "shares an enduring aspiration — even without",
+          ["★ Goal set automatically — system prompt: create a goal when",
+           "the user shares an enduring aspiration — even without",
            "the word 'goal'. No set-goal command needed."],
           bold_border=True, fill=C["hl_fill"])
     y += 150
     s.down_arrow(fx, y, y + gap)
     y += gap
-    # Step 2 — durable goal
+    # Durable goal
     s.box(fx0, y, fw, 140,
           ["Agent saves it as a DURABLE goal (Goals tab)",
            "a milestone, not a per-session goal"])
     y += 140
     s.down_arrow(fx, y, y + gap)
     y += gap
-    # Supervisor — re-asserts the goal
-    s.box(fx0, y, fw, 140,
-          ["Supervisor — hourly",
-           "re-asserts that goal each run"])
-    sup_y = y
-    y += 140
+
+    # ---- THE LOOP (same shape as Hermes: work cycle → check → loop back) ----
+    # Supervisor run starts
+    sup_start_y = y
+    s.box(fx0, y, fw, 84, ["Supervisor run starts (hourly)"])
+    sup_start_cy = y + 42
+    y += 84
     s.down_arrow(fx, y, y + gap)
     y += gap
-    # Pick the card
+    # Pick the card (the "check" — is there work?)
+    pick_y = y
     s.box(fx0, y, fw, 96,
           ["Picks the next highest-priority UNBLOCKED card"])
-    pick_y = y
+    pick_cy = y + 48
     y += 96
     s.down_arrow(fx, y, y + gap)
     y += gap
     # Subagent builds
+    build_y = y
     s.box(fx0, y, fw, 96, ["Subagent builds the picked card"])
     y += 96
     s.down_arrow(fx, y, y + gap)
     y += gap
     # Subagent updates the board
-    s.box(fx0, y, fw, 96, ["Subagent updates the board"])
     upd_y = y
+    s.box(fx0, y, fw, 96, ["Subagent updates the board"])
+    upd_cy = y + 48
     y += 96
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    # Supervisor run ends
+    s.box(fx0, y, fw, 84, ["Supervisor run ends"])
+    y += 84
 
-    # Board box on the right
+    # Board box on the right (like Hermes's Tools box on the left)
     b_x, b_w = fx0 + fw + 220, 640
-    b_y = sup_y + 40
+    b_y = pick_y + 14
     s.rect(b_x, b_y, b_w, 180, C["box"], C["border"], 2)
     s.text(b_x + b_w // 2, b_y + 52, "Board", BOX_T, C["ink"], bold=True)
-    for i, ln in enumerate(["the cards"]):
-        s.text(b_x + b_w // 2, b_y + 52 + (i + 1) * LINE_H, ln, BOX, C["ink"])
-    # arrows: supervisor reads, subagent updates (labels above the lines, in the gap)
+    s.text(b_x + b_w // 2, b_y + 52 + LINE_H, "the cards", BOX, C["ink"])
     gap_cx = (fx0 + fw + b_x) // 2
-    s.arrow(fx0 + fw + 4, pick_y + 48, b_x - 6, b_y + 95)
-    s.text(gap_cx, (pick_y + 48 + b_y + 95) // 2 - 26, "reads", SMALL, C["muted"])
-    s.arrow(fx0 + fw + 4, upd_y + 48, b_x - 6, b_y + 140)
-    s.text(gap_cx, (upd_y + 48 + b_y + 140) // 2 - 26, "updates", SMALL, C["muted"])
+    s.arrow(fx0 + fw + 4, pick_cy, b_x - 6, b_y + 95)
+    s.text(gap_cx, (pick_cy + b_y + 95) // 2 - 26, "reads", SMALL, C["muted"])
+    s.arrow(fx0 + fw + 4, upd_cy, b_x - 6, b_y + 140)
+    s.text(gap_cx, (upd_cy + b_y + 140) // 2 - 26, "updates", SMALL, C["muted"])
 
-    # Loop-back: next hour, supervisor runs again (left side)
-    loop_x = 120
-    s.line(fx, y, fx, y + 46)
-    s.line(fx, y + 46, loop_x, y + 46)
-    s.line(loop_x, y + 46, loop_x, sup_y + 70)
-    s.arrow(loop_x, sup_y + 70, fx0 - 6, sup_y + 70)
-    s.text(loop_x + 130, y + 46 - 14, "next hour — supervisor runs again",
-           SMALL, C["muted"], anchor="start")
+    # ---- CHECK (like Hermes's Judge, but no separate model) ----
+    y = y + 50
+    s.down_arrow(fx, y - 50, y)
+    jx, jw = fx - 1000, 2000
+    check_y = y
+    check_h = 240
+    s.rect(jx, check_y, jw, check_h, C["box"], C["border"], 2)
+    jcx = jx + jw // 2
+    s.text(jcx, check_y + 52,
+           "CHECK — Is there a next unblocked card?",
+           BOX_T, C["ink"], bold=True)
+    for i, ln in enumerate([
+        "The supervisor looks for the next card each hour. No separate Judge model.",
+        "If yes → next hour, the supervisor runs again (loop back).",
+        "If no → the goal is done (or blocked) — the loop pauses until there is work.",
+    ]):
+        s.text(jcx, check_y + 52 + (i + 1) * 46, ln, BOX, C["ink"])
+    check_cy = check_y + check_h // 2
+    y = check_y + check_h
 
-    # Bottom note — what Muse does NOT have
-    y = y + 110
+    # ---- LOOP BACK (right side): next hour → supervisor runs again ----
+    loop_rx = 2700
+    s.line(jx + jw, check_cy, loop_rx, check_cy)
+    s.line(loop_rx, check_cy, loop_rx, sup_start_cy)
+    s.arrow(loop_rx, sup_start_cy, fx0 + fw + 6, sup_start_cy)
+    s.text((fx0 + fw + loop_rx) // 2, sup_start_cy - 22,
+           "next hour — supervisor runs again", SMALL, C["muted"])
+
+    # Bottom note — same loop, different machinery + sources
+    y = y + 50
     NW = 2000
-    NH = 48 + 44 + 4 * 40 + 16
+    NH = 48 + 44 + 5 * 40 + 16
     note_box(s, (W - NW) // 2, y, NW, NH,
-             "Where each claim comes from (Den asked — no source code exists)",
-             ["(1) docs/goals.md — Muse's product doc: goals are managed (create / read / update / log).",
-              "(2) The system prompt — 'create a goal when the user shares an enduring aspiration'.",
-              "(3) Hermes's prompt_builder.py comment 'Muse-style goal ownership' — second-hand.",
-              "No per-session goal tool. No judge. No article, no Reddit, no shared code."])
+             "Same loop as Hermes — different machinery (Den asked)",
+             ["Goal → work → check → repeat. Hermes checks with a Judge model per turn;",
+              "Muse checks by looking for the next unblocked card each hour. No Judge.",
+              "Sources: (1) docs/goals.md (2) the system prompt (3) Hermes's 'Muse-style' comment.",
+              "No article, no Reddit post, no shared source code — Muse is closed.",
+              "No per-session goal tool. No per-turn goal check."])
     y += NH
 
     y = s.legend(y, [
-        "Solid arrow = flow  ·  loop on the left = every hour, back to the supervisor",
+        "Solid arrow = flow  ·  loop on the right = next hour, back to the supervisor run",
+        "Same shape as the Hermes diagram: goal → work cycle → check → loop back",
         "Plain boxes, black on white, as in Den's sketch",
     ])
     s._h = y
