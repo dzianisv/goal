@@ -43,8 +43,10 @@ jobs:
           fi
           echo "draw.io .deb: $DEB_URL"
           curl -sL -o /tmp/drawio.deb "$DEB_URL"
-          sudo dpkg -i /tmp/drawio.deb || sudo apt-get install -f -y -qq
-          drawio --version
+          # apt installs the .deb and its dependencies in one step.
+          sudo apt-get install -y --no-install-recommends /tmp/drawio.deb
+          # draw.io is an Electron app: it needs a display even for --version.
+          xvfb-run -a drawio --no-sandbox --version
 
       - name: Export PNG and SVG
         run: |
