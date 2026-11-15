@@ -28,7 +28,12 @@ jobs:
       - name: Install draw.io Desktop
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libasound2 libgbm1 libnss3
+          sudo apt-get install -y -qq xvfb libgbm1 libnss3
+          # ALSA lib (Electron needs it at runtime, the .deb does not declare it):
+          # named libasound2t64 on Ubuntu 24.04+, libasound2 before that.
+          sudo apt-get install -y -qq libasound2t64 \
+            || sudo apt-get install -y -qq libasound2 \
+            || echo "warning: no ALSA lib installed, draw.io may fail to start"
           DEB_URL=$(curl -s https://api.github.com/repos/jgraph/drawio-desktop/releases/latest \
             | jq -r '.assets[] | select(.name | endswith(".deb") and contains("amd64")) | .browser_download_url' \
             | head -n 1)
