@@ -24,9 +24,9 @@ flowchart TD
     AI("AI message"):::plain
     CALL("Tool call: goal { create }"):::hl
     TOOLS("Tools: goal · read · write"):::plain
-    INFER("★ AUTO-INFERRED — agent declares it in the same turn"):::hl
-    JUDGE("Judge — checks DONE only, never infers"):::plain
-    INJ("Goal fed back: heartbeat tick + idle re-poke (15 min)"):::plain
+    INFER("★ AUTO-INFERRED — agent declares it"):::hl
+    JUDGE("Judge — checks DONE only"):::plain
+    INJ("Goal fed back: heartbeat + idle (15 min)"):::plain
     OVER("Den's /goal = override only"):::plain
 
     OC --> P1
