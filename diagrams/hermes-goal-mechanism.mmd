@@ -1,28 +1,29 @@
-%% How the goal works in Hermes — Den's sketch style
-%% NOTE: the PNG (hermes-goal-mechanism.png) is the canonical
-%% readable diagram. Mermaid auto-layouts and does not preserve the
-%% sketch geometry; this file is a text representation of the
-%% same boxes and edges.
+%% How the goal works in Hermes — compact, GitHub-readable.
+%% Styled to match the PNG: plain white boxes, black borders,
+%% green highlight on the auto-inferred goal. The PNG is the
+%% full-detail version (same structure, longer notes).
 %% Read from the code: /home/engineer/.hermes/hermes-agent/
 %% tools/goal_tool.py, hermes_cli/goals.py, agent/prompt_builder.py.
-%% Verified 2026-11-15. Source of truth: gen-goal-mechanism-diagrams.py.
+%% Verified 2026-11-15. Detail lives in hermes-goal-mechanism.md.
 
 flowchart TD
-    OC["OpenClaw"]
-    P1["Profile: agent1"]
-    P2["Profile: agent2"]
-    S1["Session 1"]
-    S2["Session 2"]
-    SYS["System message"]
-    USR["User message"]
-    AI["AI message"]
-    CALL["Tool call: goal — { create, objective, acceptance_criteria }"]
-    TOOLS["Tools: goal · read · write"]
-    INFER["★ AUTO-INFERRED — in the main session\nThe agent itself, in the same turn as the user message,\ninfers the goal and declares it with this call.\nNo background API call infers the goal."]
-    JUDGE["Judge (auxiliary model) — checks DONE only\njudge_goal asks only 'is the goal DONE?' — it never infers the goal."]
-    INJ["What injects the goal back into the session?\n1 · Heartbeat tick — next_continuation_prompt feeds the goal back as a user-role message.\n2 · Idle-wake — the barrier-wake chore re-pokes an active goal after 15 min idle (idle_wake_seconds = 900).\nBoth re-assert the EXISTING goal. Never inferred in the background."]
-    OVER["Side note — /goal is an override, not the flow\nDen can set the goal with /goal — a user-set goal always wins,\nthe agent cannot replace it. That is an override, not the flow."]
-    WATCH["WATCH OUT — known bugs in Hermes (do not copy)\nGoal dies at context compression — flat goal:<session_id> lookup, no parent walk.\nAgent goals have no per-turn judge or turn budget — no stall detection.\nA dead judge never pauses the goal — it fails open to continue.\nThe agent grades its own criteria — it writes them, the audit checks them.\nStop-check plugin broken on Linux — symlink to a macOS path, does not load.\nGoal tool off by default — the mechanism is silent unless opted in."]
+    classDef plain fill:#fff,stroke:#000,stroke-width:2px,color:#000
+    classDef hl fill:#e8f5e9,stroke:#000,stroke-width:3px,color:#000
+
+    OC("OpenClaw"):::plain
+    P1("Profile: agent1"):::plain
+    P2("Profile: agent2"):::plain
+    S1("Session 1"):::plain
+    S2("Session 2"):::plain
+    SYS("System message"):::plain
+    USR("User message"):::plain
+    AI("AI message"):::plain
+    CALL("Tool call: goal { create }"):::hl
+    TOOLS("Tools: goal · read · write"):::plain
+    INFER("★ AUTO-INFERRED — agent declares it in the same turn"):::hl
+    JUDGE("Judge — checks DONE only, never infers"):::plain
+    INJ("Goal fed back: heartbeat tick + idle re-poke (15 min)"):::plain
+    OVER("Den's /goal = override only"):::plain
 
     OC --> P1
     OC --> P2
@@ -35,5 +36,6 @@ flowchart TD
     SYS --> TOOLS
     CALL --- INFER
     AI -.- JUDGE
-    CALL --> INJ
     INJ --> USR
+    CALL --> INJ
+    CALL -.- OVER

@@ -1,23 +1,25 @@
-%% How the goal works in Muse — Den's sketch style
-%% NOTE: the PNG (muse-goal-mechanism.png) is the canonical
-%% readable diagram. Mermaid auto-layouts and does not preserve the
-%% sketch geometry; this file is a text representation of the
-%% same boxes and edges.
+%% How the goal works in Muse — compact, GitHub-readable.
+%% Styled to match the PNG: plain white boxes, black borders,
+%% green highlight on the auto-inferred goal. The PNG is the
+%% full-detail version (same structure, longer notes).
 %% Muse sets the goal AUTOMATICALLY: it infers the goal from the
 %% project/conversation and declares it itself (docs/goals.md, system
 %% prompt, goal-mechanism-spec.md lines 9/50). No set-goal command
 %% from Den. From the design description + Muse's goal docs —
 %% NOT from Muse internals. Do not read more into it.
-%% Source of truth: gen-goal-mechanism-diagrams.py.
+%% Detail lives in muse-goal-mechanism.md.
 
 flowchart TD
-    AUTO["★ 1 · Muse sets the goal AUTOMATICALLY\ninfers it from the project / conversation and declares it itself\nno set-goal command from Den"]
-    SUP["Supervisor — hourly\nre-asserts that goal each run"]
-    PICK["Picks the next highest-priority UNBLOCKED card"]
-    BUILD["Subagent builds the picked card"]
-    UPD["Subagent updates the board"]
-    BOARD["Board\nthe cards — goal: declared by Muse"]
-    NOTE["The goal is set automatically — Den never issues a set-goal command\nMuse infers the goal from the project / conversation and declares it itself.\nDen states what he wants in conversation — product owner, not goal-setter.\nNo idle trigger — hourly schedule."]
+    classDef plain fill:#fff,stroke:#000,stroke-width:2px,color:#000
+    classDef hl fill:#e8f5e9,stroke:#000,stroke-width:3px,color:#000
+
+    AUTO("★ Muse sets the goal AUTOMATICALLY"):::hl
+    SUP("Supervisor — hourly, re-asserts the goal"):::plain
+    PICK("Picks next UNBLOCKED card"):::plain
+    BUILD("Subagent builds the card"):::plain
+    UPD("Subagent updates the board"):::plain
+    BOARD("Board"):::plain
+    NOTE("No set-goal command from Den · hourly only, no idle trigger"):::plain
 
     AUTO --> SUP
     SUP --> PICK
@@ -26,3 +28,4 @@ flowchart TD
     UPD --> SUP
     PICK --> BOARD
     UPD --> BOARD
+    AUTO -.- NOTE
