@@ -8,7 +8,7 @@ One-line answer, both systems: the goal is auto-inferred. The agent itself reads
 - **Muse:** Muse infers the goal from the project and declares it. An hourly supervisor re-asserts it each run and picks the next card. See [muse-goal-mechanism.md](muse-goal-mechanism.md).
 - **OpenClaw:** spec only. Nothing is built. See [goal-mechanism-spec.md](goal-mechanism-spec.md).
 
-Diagrams live in `diagrams/` as Mermaid source plus the generator that renders the PNGs. No PNGs in this repo. Rendered images are on the Notion page ([OpenClaw/Hermes goal plugin](https://app.notion.com/p/418ac25eb49f80f4a0a5e571a065c793)).
+Diagrams live in `diagrams/` as Mermaid source plus the generator that renders the PNGs. No PNGs in this repo.
 
 ## Files
 
