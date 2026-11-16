@@ -29,14 +29,12 @@ Facts (verified from code, 2026-11-15):
   the EXISTING goal; neither infers a new one.
 - Hermes source: /home/engineer/.hermes/hermes-agent/
   tools/goal_tool.py, hermes_cli/goals.py, agent/prompt_builder.py:240.
-- Muse: NO source code (closed). The "automatic" goal comes from an
-  instruction in the system prompt: create a goal when the user shares
-  an enduring aspiration, a commitment, progress, or a setback — even
-  without the word "goal". The agent saves it as a DURABLE goal (Goals
-  tab) with the goal tools. No per-session goal tool. No judge. The
-  hourly supervisor re-asserts the goal each run. Evidence: docs/goals.md
-  + the system prompt + Hermes's "Muse-style goal ownership" comment
-  (second-hand, from Hermes's code, not Muse's). Do not read more into it.
+- Muse: NO source code (closed). CORRECTED 2026-11-16: research found NO
+  public evidence for an hourly supervisor picking unblocked cards, and no
+  Judge in Meta Muse material (see muse-goal-mechanism.md). The muse
+  diagram below still draws the OLD loop — kept for the record, do not
+  present it as verified. The session-goal tool shape comes from Muse
+  Code, the Judge shape from Hermes.
 
 Hand-built SVG, standard library only.
 Render: chrome-headless-shell --force-device-scale-factor=3 (native 3x;
@@ -347,7 +345,7 @@ def muse_diagram(out_path):
     s = Svg()
     y = s.header(
         "How the goal works in Muse — the same loop, different machinery",
-        "From the docs + system prompt — NOT from Muse internals (closed source) · do not read more into it")
+        "CORRECTED 2026-11-16: no public evidence for this loop — kept for the record, do not present as verified")
     cx = W // 2
     fx = cx - 300          # flow centre (board box sits on the right)
     fw = 1200
@@ -467,7 +465,171 @@ def muse_diagram(out_path):
     return s.build(out_path)
 
 
+# ---- OpenClaw goal plugin: the built loop ----
+# CORRECTED 2026-11-16 (research report
+# ~/workspace/research_notes/muse-goal-mechanism-evidence-20261115-1423/report.md):
+# personal Muse is closed source — no public evidence for an hourly
+# supervisor picking unblocked cards, no Judge in Meta Muse material.
+# This plugin's shape comes from Muse Code (session goal tool +
+# post-turn follow-up queue) and Hermes (Judge + registry + push).
+# Two plugins: goal (agent_end Judge + push) + goal-tool (defineToolPlugin
+# exposes the goal tool — registerTool inside definePluginEntry does NOT
+# expose tools to agents). Registry: SQLite goal.db, keyed to the stable
+# session key agent:<id>:main, survives compaction. Judge: separate model
+# call (openclaw capability model run), every turn-end, agent goals
+# included. Push: continuation prompt via agentTurn. Heartbeat
+# re-assertion (heartbeat_prompt_contribution) and the hourly supervisor
+# audit are DECIDED, not yet implemented — the diagram marks them so.
+# See openclaw-goal-plugin-design.md for live status per piece.
+
+def openclaw_goal_plugin_diagram(out_path):
+    s = Svg()
+    y = s.header(
+        "How the goal works in the OpenClaw goal plugin — the whole loop",
+        "Two plugins: goal (Judge + push) + goal-tool (the goal tool) · built 2026-11-16")
+    cx = W // 2
+    fx = cx - 300          # flow centre (side boxes sit left and right)
+    fw = 1200
+    fx0 = fx - fw // 2
+    gap = 34
+
+    # Turn starts
+    turn_y = y
+    s.box(fx0, y, fw, 84, ["Turn starts — agent calls goal(get) first"])
+    turn_cy = y + 42
+    y += 84
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    # Goal tool — green, bold border. THE point where the goal is declared.
+    tool_y = y
+    s.box(fx0, y, fw, 150,
+          ["★ Agent calls the goal tool",
+           "get / create / link / complete / wait / resume / clear",
+           "create declares objective + acceptance criteria"],
+          bold_border=True, fill=C["hl_fill"])
+    tool_cy = y + 75
+    y = tool_y + 150
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    # Registry
+    reg_y = y
+    s.box(fx0, y, fw, 140,
+          ["Registry — SQLite goal.db, one row per session",
+           "keyed agent:<id>:main — survives compaction"])
+    reg_cy = y + 70
+    y += 140
+    s.down_arrow(fx, y, y + gap)
+    y += gap
+    # Turn ends
+    s.box(fx0, y, fw, 84, ["Turn ends — agent_end hook fires"])
+    y += 84
+
+    # goal-tool plugin box on the left, aligned with the green box
+    tools_x, tools_w = 60, 380
+    tools_y = tool_cy - 120
+    tools_h = 240
+    s.rect(tools_x, tools_y, tools_w, tools_h, C["box"], C["border"], 2)
+    s.text(tools_x + tools_w // 2, tools_y + 52, "goal-tool plugin:", BOX_T,
+           C["ink"], bold=True)
+    for i, t in enumerate(["defineToolPlugin", "declares", 'contracts.tools: ["goal"]']):
+        s.text(tools_x + tools_w // 2, tools_y + 52 + (i + 1) * LINE_H, t,
+               SMALL, C["ink"])
+    s.arrow(tools_x + tools_w + 4, tool_cy, fx0 - 6, tool_cy)
+
+    # goal plugin box on the right, aligned with the registry box
+    gp_x, gp_w = fx0 + fw + 80, 900
+    gp_y = reg_y - 10
+    s.rect(gp_x, gp_y, gp_w, 200, C["box"], C["border"], 2)
+    s.text(gp_x + 30, gp_y + 52, "goal plugin (definePluginEntry)", BOX_T,
+           C["ink"], bold=True, anchor="start")
+    for i, ln in enumerate([
+        "agent_end hook: Judge + push.",
+        "No tool — registerTool here does NOT expose tools.",
+    ]):
+        s.text(gp_x + 30, gp_y + 52 + (i + 1) * 40, ln, SMALL, C["ink"],
+               anchor="start")
+    s.arrow(fx0 + fw + 4, reg_cy, gp_x - 6, reg_cy)
+
+    # ---- JUDGE (post-turn hook, IN the main flow) ----
+    y = y + 50
+    s.down_arrow(fx, y - 50, y)
+    jx, jw = fx - 1000, 2000
+    judge_y = y
+    judge_h = 280
+    s.rect(jx, judge_y, jw, judge_h, C["box"], C["border"], 2)
+    jcx = jx + jw // 2
+    s.text(jcx, judge_y + 52,
+           "JUDGE — a separate model call (openclaw capability model run)",
+           BOX_T, C["ink"], bold=True)
+    for i, ln in enumerate([
+        "Runs AFTER the turn ends, every turn — agent goals included.",
+        "done / continue / blocked / wait — DONE needs evidence, never a bare claim.",
+        "Stall: same reply 5x → paused · Judge down 3x → paused · turn budget 20.",
+        "If continue → push a continuation prompt → next turn.",
+    ]):
+        s.text(jcx, judge_y + 52 + (i + 1) * 46, ln, BOX, C["ink"])
+    judge_cy = judge_y + judge_h // 2
+    y = judge_y + judge_h
+
+    # ---- PUSH (the wake) ----
+    y = y + 50
+    s.down_arrow(fx, y - 50, y)
+    push_y = y
+    s.box(fx0, y, fw, 96,
+          ["Push — continuation prompt via agentTurn",
+           "into the idle session"])
+    push_cy = y + 48
+    y = push_y + 96
+
+    # ---- LOOP BACK (right side): push → next turn ----
+    loop_rx = 2700
+    s.line(fx0 + fw, push_cy, loop_rx, push_cy)
+    s.line(loop_rx, push_cy, loop_rx, turn_cy)
+    s.arrow(loop_rx, turn_cy, fx0 + fw + 6, turn_cy)
+    s.text((fx0 + fw + loop_rx) // 2, turn_cy - 22,
+           "continuation prompt → next turn", SMALL, C["muted"])
+
+    # ---- BACKSTOPS: heartbeat re-assertion + hourly supervisor audit ----
+    y = y + 50
+    NW = 1290
+    NH = 48 + 44 + 4 * 40 + 16
+    note_box(s, MARGIN, y, NW, NH,
+             "Heartbeat — re-asserts the goal each tick",
+             ["heartbeat_prompt_contribution adds the active",
+              "goal to every heartbeat prompt.",
+              "DECIDED, not yet implemented — today the",
+              "agent re-reads it via goal(get) at turn start."])
+    note_box(s, MARGIN + NW + 24, y, NW, NH,
+             "Hourly supervisor audit — catches stuck goals",
+             ["Reads the registry + the board once an hour.",
+              "Picks the next UNBLOCKED card, dispatches",
+              "a subagent via agentTurn. Only for goals the",
+              "per-turn Judge never sees (no turn = no audit)."])
+    y += NH
+
+    # Bottom note — research correction
+    y = y + 50
+    NW2 = 2680
+    NH2 = 48 + 44 + 4 * 40 + 16
+    note_box(s, (W - NW2) // 2, y, NW2, NH2,
+             "Research correction — what this plugin is NOT copying",
+             ["Personal Muse is closed source: no public evidence for an hourly",
+              "supervisor picking unblocked cards, and no Judge in Meta Muse.",
+              "Shape follows Muse Code (session goal tool + post-turn follow-up)",
+              "and Hermes (Judge + registry + push). See muse-goal-mechanism.md."])
+    y += NH2
+
+    y = s.legend(y, [
+        "Solid arrow = flow  ·  loop on the right = next turn (push feeds the goal back in)",
+        "Bold green box = the goal, declared by the agent in the main session",
+        "Plain boxes, black on white, as in Den's sketch  ·  live status per piece: openclaw-goal-plugin-design.md",
+    ])
+    s._h = y
+    return s.build(out_path)
+
+
 if __name__ == "__main__":
     d = os.path.dirname(os.path.abspath(__file__))
     hermes_diagram(os.path.join(d, "hermes-goal-mechanism.svg"))
     muse_diagram(os.path.join(d, "muse-goal-mechanism.svg"))
+    openclaw_goal_plugin_diagram(os.path.join(d, "openclaw-goal-plugin.svg"))
