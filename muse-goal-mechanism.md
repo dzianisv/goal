@@ -1,10 +1,10 @@
 # How Muse does it
 
-From the design description + Muse's goal docs (`docs/goals.md`, the system prompt). NOT from Muse internals — Muse is closed source, there is no public code to read. Do not read more into it.
+Muse is closed source — nothing to read. This is from the design description + Muse's goal docs (`docs/goals.md`, the system prompt), not internals.
 
 ## Where this comes from (Den asked)
 
-There is no article, no Reddit post, and no shared source code. Muse is closed source — nothing to read. The mechanism above comes from three places:
+There is no article, no Reddit post, and no shared source code. The mechanism comes from three places:
 
 1. **`docs/goals.md`** — Muse's product doc. It describes goal management: goals are durable milestones, maintained and managed by Muse, created/read/updated/logged with the goal tools. It says real background work on a goal happens only through scheduled jobs.
 2. **The system prompt** — the instruction quoted below ("create a goal when the user shares an enduring aspiration..."). This is the "automatic" part. It is in Muse's own system prompt, which I can read.
@@ -31,8 +31,6 @@ The agent saves it as a DURABLE goal (Goals tab) with the goal tools — a miles
 - No per-turn goal mechanism at all. The goal is a durable milestone; it stays alive because the system-prompt instruction creates it and the hourly supervisor re-asserts it.
 
 The behavior looks similar to Hermes (the goal appears without a set-goal command) but the mechanism is different. Do not call it "the same auto-inference as Hermes" — Hermes infers a per-session goal with a tool call and a judge; Muse creates a durable goal from a system-prompt instruction.
-
-Where the "Muse-style" phrase comes from: Hermes's own code (`agent/prompt_builder.py` line 240) calls its design "Muse-style goal ownership: the model declares the session goal itself". That is Hermes's developers describing the pattern they copied. It is second-hand evidence about Muse, not Muse source.
 
 ## The loop — same shape as Hermes, different machinery
 

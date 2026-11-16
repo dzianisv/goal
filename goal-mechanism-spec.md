@@ -1,6 +1,7 @@
 # Implementation spec — Hermes-like goal mechanism for OpenClaw
 
-Status: SPEC ONLY. Den ordered 2026-11-15: write the spec, DO NOT start implementation.
+Status: implementation underway on Den's 2026-11-16 order (reactive wake: kanban-wake plugin + goal plugin). Spec written 2026-11-15; was spec-only until Den ordered the build.
+Canonical copy. Public mirror: dzianisv/goal (goal-mechanism-spec.md). Keep the two identical.
 Author: Ember. Date: 2026-11-15.
 Reference: the Hermes goal implementation in `/home/engineer/.hermes/hermes-agent/` (read live 2026-11-15). All file/line citations below are from that repo.
 
@@ -61,7 +62,7 @@ And the comment above it: "Muse-style goal ownership: the model declares the ses
 
 ### 2.6 What the heartbeat does
 
-The heartbeat continues an active goal: it feeds `next_continuation_prompt()` back into the conversation as a user-role message. For agent goals the kick is a fixed sentence + contract/requirements. The goal is never judged per turn for agent goals; the heartbeat is the continuation mechanism. The heartbeat prompt files (`heartbeat-focus-prompt.md`, `heartbeat-prompt.md` in a profile) are ONE agent's tick routine containing goal text for that agent's workflow — they are NOT the goal mechanism. Do not confuse them again.
+The heartbeat continues an active goal: it feeds `next_continuation_prompt()` back into the conversation as a user-role message. For agent goals the kick is a fixed sentence + contract/requirements. The goal is never judged per turn for agent goals; the heartbeat is the continuation mechanism. The heartbeat prompt files (`heartbeat-focus-prompt.md`, `heartbeat-prompt.md` in a profile) are ONE agent's tick routine containing goal text for that agent's workflow — they are NOT the goal mechanism.
 
 ## 3. Known bugs in the Hermes implementation (DO NOT copy these)
 
